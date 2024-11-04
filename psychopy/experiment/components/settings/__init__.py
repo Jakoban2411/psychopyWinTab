@@ -1657,6 +1657,13 @@ class SettingsComponent:
                 )
                 buff.writeIndentedLines(code % inits)
 
+        # Add Wintab device to ioConfig
+        code = ("\n"
+                "# Setup iohub Wintab \n"
+                "ioConfig['wintab.Wintab'] = { 'name': 'pen','mouse_simulation':{'enable': False,'leave_region_timeout': 2.0}}\n"
+                )
+        buff.writeIndentedLines(code % inits)
+
         # Add keyboard to ioConfig
         if self.params['keyboardBackend'] == 'ioHub':
             code = (

@@ -35,6 +35,7 @@ from .image import ImageStim
 from .text import TextStim
 from .form import Form
 from .brush import Brush
+from .wintabbrush import WintabBrush
 from .textbox2.textbox2 import TextBox2
 from .button import ButtonStim
 from .roi import ROI
