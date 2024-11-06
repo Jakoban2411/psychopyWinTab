@@ -21,7 +21,7 @@ class WintabBrush(MinimalStim):
                  name=None,
                  depth=-10000,
                  traceDepth=-1000,
-                 autoLog=None,
+                 autoLog=False,
                  autoDraw=False,
                  min_opacity=0.0, hover_color=(0, 0, 255),
                  touching_color=(0, 255, 0), tiltline_color=(255, 255, 0),
@@ -81,7 +81,7 @@ class PenPositionStim(MinimalStim):
                 touching_color=(0, 255, 0), tiltline_color=(255, 255, 0),
                 tiltline_width=1,
                 min_size=0.033, size_range=0.033, tiltline_scalar=1.0,
-                name=None, autoLog=None, depth=-10000, colorSpace='rgb255'):
+                name=None, autoLog=False, depth=-10000, colorSpace='rgb255'):
         self.win = win
         self.depth = depth
         super(PenPositionStim, self).__init__(name, autoLog)
@@ -132,6 +132,7 @@ class PenPositionStim(MinimalStim):
                                         end=[0, 0],
                                         colorSpace='rgb255',
                                         lineColor=self.tiltline_color,
+                                        autoLog=False,
                                         opacity=0.0)
         # self.pen_tilt_line.opacity=0.0
 
@@ -225,7 +226,7 @@ class PenTracesStim(MinimalStim):
     """
 
     def __init__(self, win, lineWidth=2, lineColor=(0, 0, 0), opacity=1.0,
-                maxlen=256, name=None, autoLog=None, depth=-1000):
+                maxlen=256, name=None, autoLog=False, depth=-1000):
         self.depth = depth
         self.win = win
         super(PenTracesStim, self).__init__(name, autoLog)
@@ -239,6 +240,7 @@ class PenTracesStim(MinimalStim):
         self.current_points = []
         # The last pen position added to a pen trace.
         self.last_pos = [0, 0]
+        self.autoLog = autoLog
 
         self.lineWidth = lineWidth
         self.lineColor = lineColor
@@ -305,6 +307,7 @@ class PenTracesStim(MinimalStim):
                                                 size=1,
                                                 ori=0.0,
                                                 opacity=self.opacity,
+                                                autoLog=self.autoLog,
                                                 interpolate=True)
         self.pentracestim.append(self.current_pentrace)
 

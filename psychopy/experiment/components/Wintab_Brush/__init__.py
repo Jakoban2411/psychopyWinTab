@@ -17,7 +17,7 @@ class WintabBrushComponent(BaseVisualComponent):
 
     categories = ['Responses']
     targets = ['PsychoPy', 'PsychoJS']
-    iconFile = Path(__file__).parent / 'Wintab.png'
+    iconFile = Path(__file__).parent / 'brush.png'
     tooltip = _translate('BWintab Brush: a Wintab drawing tool')
 
     def __init__(self, exp, parentName, name='WintabBrush',
@@ -168,11 +168,6 @@ class WintabBrushComponent(BaseVisualComponent):
                 "   #    print e \n"
                 "   last_evt = wtab_evts[-1] \n"
                 "   {name}.updateFromEvents(wtab_evts) \n"
-                "   penPosX = last_evt.dict['x'] \n"
-                "   penPosY = last_evt.dict['y'] \n"
-                "   penPressure = last_evt.dict['pressure'] \n"
-                "   penSample = f'x: {{penPosX}}, y: {{penPosY}}, pressure: {{penPressure}}' \n"
-                "   print(penSample) \n"
                 "{name}.draw()").format(name=self.params['name'])
         buff.writeIndented(code)
 
