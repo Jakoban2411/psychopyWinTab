@@ -3,9 +3,8 @@ from pathlib import Path
 import numpy as np
 
 from psychopy import layout
-from psychopy.alerts import addAlertHandler
 from psychopy.alerts._errorHandler import _BaseErrorHandler
-from psychopy.tests.test_visual.test_basevisual import _TestColorMixin, _TestUnitsMixin, _TestSerializationMixin
+from psychopy.tests.test_visual.test_basevisual import _TestColorMixin, _TestUnitsMixin
 from psychopy.tests.test_experiment.test_component_compile_python import _TestBoilerplateMixin
 from psychopy.visual import Window
 from psychopy.visual import TextBox2
@@ -18,11 +17,10 @@ from psychopy.tests import utils
 
 
 @pytest.mark.textbox
-class Test_textbox(_TestColorMixin, _TestUnitsMixin, _TestBoilerplateMixin, _TestSerializationMixin):
+class Test_textbox(_TestColorMixin, _TestUnitsMixin, _TestBoilerplateMixin):
     def setup_method(self):
         self.win = Window((128, 128), pos=(50, 50), monitor="testMonitor", allowGUI=False, autoLog=False)
         self.error = _BaseErrorHandler()
-        addAlertHandler(self.error)
         self.textbox = TextBox2(self.win,
                                 "A PsychoPy zealot knows a smidge of wx, but JavaScript is the question.",
                                 placeholder="Placeholder text",

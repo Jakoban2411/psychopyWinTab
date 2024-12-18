@@ -101,14 +101,7 @@ class PipeReader(Thread):
     @property
     def isAvailable(self):
         """Are there bytes available to be read (`bool`)?"""
-        if self._queue.full():
-            return True
-        elif self._overflowBuffer:  # have leftover bytes
-            self._queue.put("".join(self._overflowBuffer))
-            self._overflowBuffer = []  # clear the overflow buffer
-            return True
-        else:
-            return False
+        return self._queue.full()
 
     def read(self):
         """Read all bytes enqueued by the thread coming off the pipe. This is
@@ -200,10 +193,7 @@ class Job:
     """
     def __init__(self, parent, command='', terminateCallback=None,
                  inputCallback=None, errorCallback=None, extra=None):
-        # use the app instance if parent isn't given
-        if parent is None:
-            from psychopy.app import getAppInstance
-            parent = getAppInstance()
+
         # command to be called, cannot be changed after spawning the process
         self.parent = parent
         self._command = command

@@ -13,13 +13,13 @@ zeroRPC
 
 
 import inspect
+import logging
 import asyncio
 import signal
 import json
 import sys
 import traceback
-import logging as _logging
-from psychopy import logging
+
 from psychopy.localization import _translate
 
 try:
@@ -56,36 +56,6 @@ class LiaisonJSONEncoder(json.JSONEncoder):
 			return str(o)
 
 
-class LiaisonLogger(logging._Logger):
-	"""
-	Special logger for Liaison which logs any messages sent, and the direction they 
-	were sent in (Python to JS or JS to Python). Logs both at level INFO.
-	"""	
-	def sent(self, message):
-		"""
-		Log a message sent by Liaison
-		"""
-		self.log(
-			message=message,
-			level=logging.INFO,
-			levelname="LIAISON PY->JS",
-		)
-		# immediately flush - we're not in a frame loop
-		self.flush()
-	
-	def received(self, message):
-		"""
-		Log a message received by Liaison
-		"""
-		self.log(
-			message=message,
-			level=logging.INFO,
-			levelname="LIAISON JS->PY",
-		)
-		# immediately flush - we're not in a frame loop
-		self.flush()
-
-
 class WebSocketServer:
 	"""
 	A simple Liaison server, using WebSockets as communication protocol.
@@ -98,30 +68,18 @@ class WebSocketServer:
 		# the set of currently established connections:
 		self._connections = set()
 
-		# setup a dedicated logger for messages
-		self.logger = LiaisonLogger()
-		# setup a base Python logger
-		self._logger = _logging.getLogger('liaison.WebSocketServer')
+		# setup a logger:
+		self._logger = logging.getLogger('liaison.WebSocketServer')
 		self._logger.setLevel(logging.DEBUG)
-		consoleHandler = _logging.StreamHandler()
-		consoleHandler.setLevel(_logging.DEBUG)
-		consoleHandler.setFormatter(_logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+		consoleHandler = logging.StreamHandler()
+		consoleHandler.setLevel(logging.DEBUG)
+		consoleHandler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 		self._logger.addHandler(consoleHandler)
 
 		# register the Liaison methods available to clients:
 		self._methods = {
-			'liaison': (self, ['listRegisteredMethods', 'addLogFile', 'pingPong'])
+			'liaison': (self, ['listRegisteredMethods', 'pingPong'])
 		}
-	
-	def addLogFile(self, file, loggingLevel=logging.INFO):
-		# actualize logging level
-		if isinstance(loggingLevel, str):
-			loggingLevel = getattr(logging, loggingLevel.upper())
-		# if given a log file, add it
-		logFile = logging.LogFile(
-			file, level=logging.DEBUG
-		)
-		self._logger.addTarget(logFile)
 
 	def registerObject(self, targetObject, referenceName):
 		"""
@@ -292,7 +250,6 @@ class WebSocketServer:
 		if not isinstance(message, str):
 			message = json.dumps(message, cls=LiaisonJSONEncoder)
 		for websocket in self._connections:
-			self.logger.sent(message)
 			await websocket.send(message)
 
 	def broadcastSync(self, message):
@@ -372,8 +329,6 @@ class WebSocketServer:
 		message : string
 			the message sent by the client to the server, as a JSON string
 		"""
-		# log message
-		self.logger.received(message)
 		# decode the message:
 		try:
 			decodedMessage = json.loads(message)
@@ -401,7 +356,7 @@ class WebSocketServer:
 					# try to parse json string
 					try:
 						arg = json.loads(arg)
-					except (json.decoder.JSONDecodeError, TypeError):
+					except json.decoder.JSONDecodeError:
 						pass
 					# if arg is a known property, get its value
 					arg = self.actualizeAttributes(arg)
@@ -454,13 +409,11 @@ class WebSocketServer:
 					if 'messageId' in decodedMessage:
 						response['messageId'] = decodedMessage['messageId']
 
-					self.logger.sent(response)
 					await websocket.send(json.dumps(response))
 
 		except BaseException as err:
 			# JSONify any errors
 			err = json.dumps(err, cls=LiaisonJSONEncoder)
 			# send to server
-			self.logger.sent(err)
 			await websocket.send(err)
 			

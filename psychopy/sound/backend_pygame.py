@@ -153,7 +153,7 @@ class SoundPygame(_SoundBase):
                  hamming=False, speaker=None):
         self.name = name  # only needed for autoLogging
         self.autoLog = autoLog
-        self.speaker = speaker
+        self.speaker = self._parseSpeaker(speaker)
 
         if stereo == True:
             stereoChans = 2

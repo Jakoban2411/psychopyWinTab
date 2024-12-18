@@ -35,7 +35,7 @@ import shutil
 import site
 
 # On import we want to configure the user site-packages dir and add it to the
-# import path.
+# import path. 
 # set user site-packages dir
 if os.environ.get('PSYCHOPYNOPACKAGES', '0') == '1':
     site.ENABLE_USER_SITE = True
@@ -43,14 +43,14 @@ if os.environ.get('PSYCHOPYNOPACKAGES', '0') == '1':
     site.USER_BASE = None
     logging.debug(
         'User site-packages dir set to: %s' % site.getusersitepackages())
-
+    
     # add paths from main plugins/packages (installed by plugins manager)
     site.addsitedir(prefs.paths['userPackages'])  # user site-packages
     site.addsitedir(prefs.paths['userInclude'])  # user include
     site.addsitedir(prefs.paths['packages'])  # base package dir
 
-if site.USER_SITE not in sys.path:
-    site.addsitedir(site.getusersitepackages())
+if not site.USER_SITE in sys.path:
+    site.addsitedir(site.getusersitepackages()) 
 
 # cache list of packages to speed up checks
 _installedPackageCache = []
@@ -58,10 +58,6 @@ _installedPackageNamesCache = []
 
 # reference the user packages path
 USER_PACKAGES_PATH = str(prefs.paths['userPackages'])
-
-
-class PluginRequiredError(Exception):
-    pass
 
 
 class PluginStub:
@@ -86,23 +82,22 @@ class PluginStub:
         cls.__doc__ = (
             "`{mro}` is now located within the `{plugin}` plugin. You can find the documentation for it `here <{doclink}>`_."
         ).format(
-            mro=cls.__module__,
+            mro=cls.__mro__,
             plugin=plugin,
             doclink=doclink
         )
-
-
-    def __init__(self, *args, **kwargs):
+    
+    def __call__(self, *args, **kwargs):
         """
         When initialised, rather than creating an object, will log an error.
         """
-        raise PluginRequiredError((
+        raise NameError(
             "Support for `{mro}` is not available this session. Please install "
             "`{plugin}` and restart the session to enable support."
         ).format(
-            mro=type(self).__module__,
+            mro=type(self).__mro__,
             plugin=self.plugin,
-        ))
+        )
 
 
 def refreshPackages():
@@ -117,21 +112,14 @@ def refreshPackages():
 
     _installedPackageCache.clear()
     _installedPackageNamesCache.clear()
-
+    
     # iterate through installed packages in the user folder
     for dist in importlib.metadata.distributions(path=sys.path + [USER_PACKAGES_PATH]):
         # get name if in 3.8
-
-        if sys.version_info.major == 3:
-            if sys.version_info.minor <= 9:
-                distName = dist.metadata['name']
-            else:
-                distName = dist.name
+        if sys.version.startswith("3.8"):
+            distName = dist.metadata['name']
         else:
-            raise VersionError(
-                "PsychoPy only supports Python 3.8 and above. "
-                "Please upgrade your Python installation.")
-
+            distName = dist.name
         # mark as installed
         _installedPackageCache.append(
             (distName, dist.version)
@@ -197,17 +185,8 @@ def addDistribution(distPath):
         sys.path.append(distPath)
 
 
-def installPackage(
-    package,
-    target=None,
-    upgrade=False,
-    forceReinstall=False,
-    noDeps=False,
-    awaited=True,
-    outputCallback=None,
-    terminateCallback=None,
-    extra=None,
-):
+def installPackage(package, target=None, upgrade=False, forceReinstall=False,
+                   noDeps=False):
     """Install a package using the default package management system.
 
     This is intended to be used only by PsychoPy itself for installing plugins
@@ -230,56 +209,33 @@ def installPackage(
         they are present in the current distribution.
     noDeps : bool
         Don't install dependencies if `True`.
-    awaited : bool
-        If False, then use an asynchronous install process - this function will return right away
-        and the plugin install will happen in a different thread.
-    outputCallback : function
-        Function to be called when any output text is received from the process performing the
-        install. Not used if awaited=True.
-    terminateCallback : function
-        Function to be called when installation is finished. Not used if awaited=True.
-    extra : dict
-        Extra information to be supplied to the install thread when installing asynchronously.
-        Not used if awaited=True.
 
     Returns
     -------
-    tuple or psychopy.app.jobs.Job
-        If `awaited=True`:
-            `True` if the package installed without errors. If `False`, check
-            'stderr' for more information. The package may still have installed
-            correctly, but it doesn't work. Second value contains standard output
-            and error from the subprocess.
-        If `awaited=False`:
-            Returns the job (thread) which is running the install.
+    tuple
+        `True` if the package installed without errors. If `False`, check
+        'stderr' for more information. The package may still have installed
+        correctly, but it doesn't work. Second value contains standard output
+        and error from the subprocess.
+
     """
-    # convert extra to dict
-    if extra is None:
-        extra = {}
+    if target is None:
+        target = prefs.paths['userPackages']
+
+    # check the directory exists before installing
+    if not os.path.exists(target):
+        raise NotADirectoryError(
+            'Cannot install package "{}" to "{}", directory does not '
+            'exist.'.format(package, target))
 
     # construct the pip command and execute as a subprocess
     cmd = [sys.executable, "-m", "pip", "install", package]
 
     # optional args
     if target is None:  # default to user packages dir
-        # check if we are in a virtual environment, if so, dont use --user
-        if hasattr(sys, 'real_prefix') or (
-                hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
-            # we are in a venv
-            logging.warning(
-                "You are installing a package inside a virtual environment. "
-                "The package will be installed in the user site-packages "
-                "directory."
-            )
-        else:
-            cmd.append('--user')
+        cmd.append('--prefix')
+        cmd.append(prefs.paths['packages'])
     else:
-        # check the directory exists before installing
-        if target is not None and not os.path.exists(target):
-            raise NotADirectoryError(
-                'Cannot install package "{}" to "{}", directory does not '
-                'exist.'.format(package, target))
-
         cmd.append('--target')
         cmd.append(target)
     if upgrade:
@@ -289,57 +245,44 @@ def installPackage(
     if noDeps:
         cmd.append('--no-deps')
 
+    # check if we are in a virtual environment, if so, dont use --user
+    if hasattr(sys, 'real_prefix') or (
+            hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+        # we are in a venv
+        logging.warning(
+            "You are installing a package inside a virtual environment. "
+            "The package will be installed in the user site-packages directory."
+        )
+    else:
+        cmd.append('--user')
+
     cmd.append('--prefer-binary')  # use binary wheels if available
     cmd.append('--no-input')  # do not prompt, we cannot accept input
     cmd.append('--no-color')  # no color for console, not supported
     cmd.append('--no-warn-conflicts')  # silence non-fatal errors
-    cmd.append('--disable-pip-version-check')  # do not check for pip updates
 
     # get the environment for the subprocess
     env = os.environ.copy()
 
-    # if unawaited, try to get jobs handler
-    if not awaited:
-        try:
-            from psychopy.app import jobs
-        except ModuleNotFoundError:
-            logging.warn(_translate(
-                "Could not install package {} asynchronously as psychopy.app.jobs is not found. "
-                "Defaulting to synchronous install."
-            ).format(package))
-            awaited = True
-    if awaited:
-        # if synchronous, just use regular command line
-        proc = sp.Popen(
-            cmd,
-            stdout=sp.PIPE,
-            stderr=sp.PIPE,
-            shell=False,
-            universal_newlines=True,
-            env=env
-        )
-        # run
-        stdout, stderr = proc.communicate()
-        # print output
-        sys.stdout.write(stdout)
-        sys.stderr.write(stderr)
-        # refresh packages once done
-        refreshPackages()
+    # run command in subprocess
+    output = sp.Popen(
+        cmd,
+        stdout=sp.PIPE,
+        stderr=sp.PIPE,
+        shell=False,
+        universal_newlines=True,
+        env=env)
+    stdout, stderr = output.communicate()  # blocks until process exits
 
-        return isInstalled(package), {'cmd': cmd, 'stdout': stdout, 'stderr': stderr}
-    else:
-        # otherwise, use a job (which can provide live feedback)
-        proc = jobs.Job(
-            parent=None,
-            command=cmd,
-            inputCallback=outputCallback,
-            errorCallback=outputCallback,
-            terminateCallback=terminateCallback,
-            extra=extra,
-        )
-        proc.start(env=env)
+    sys.stdout.write(stdout)
+    sys.stderr.write(stderr)
 
-        return proc
+    refreshPackages()
+
+    # Return True if installed, False if not
+    retcode = isInstalled(package)
+    # Return the return code and a dict of information from the console
+    return retcode, {"cmd": cmd, "stdout": stdout, "stderr": stderr}
 
 
 def _getUserPackageTopLevels():
@@ -359,7 +302,7 @@ def _getUserPackageTopLevels():
 
     foundTopLevelDirs = dict()
     for foundDir in userPackageDirs:
-        if not foundDir.endswith('.dist-info'):
+        if not  foundDir.endswith('.dist-info'):
             continue
 
         topLevelPath = os.path.join(userPackageDir, foundDir, 'top_level.txt')
@@ -406,7 +349,7 @@ def _isUserPackage(package):
             distName = dist.name
         # get name
         userPackages.append(distName)
-
+    
     return package in userPackages
 
 
@@ -434,7 +377,7 @@ def _uninstallUserPackage(package):
     # string to use as stdout
     stdout = ""
     # take note of this function being run as if it was a command
-    cmd = "python psychopy.tools.pkgtools._uninstallUserPackage(package)"
+    cmd = f"python psychopy.tools.pkgtools._uninstallUserPackage(package)"
 
     userPackagePath = getUserPackagesPath()
 
@@ -472,19 +415,18 @@ def _uninstallUserPackage(package):
                 stdout += _translate(
                     "Could not remove {absPath}, reason: {err}".format(absPath=absPath, err=err)
                 )
-
+    
     # log success
     msg = 'Uninstalled package `{}`.'.format(package)
     logging.info(msg)
     stdout += msg + "\n"
-
+    
     # return the return code and a dict of information from the console
     return True, {
         "cmd": cmd,
         "stdout": stdout,
         "stderr": ""
     }
-
 
 def uninstallPackage(package):
     """Uninstall a package from the current distribution.
@@ -650,7 +592,7 @@ def getPypiInfo(packageName, silence=False):
             "Could not get info for package {}. Reason:\n"
             "\n"
             "{}"
-        ).format(packageName, err), style=wx.ICON_ERROR)
+        ).format(packageName,err), style=wx.ICON_ERROR)
         if not silence:
             dlg.ShowModal()
         return

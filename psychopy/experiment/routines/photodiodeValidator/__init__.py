@@ -11,23 +11,21 @@ from psychopy.localization import _translate
 
 class PhotodiodeValidatorRoutine(BaseValidatorRoutine, PluginDevicesMixin):
     """
-    Use a photodiode to confirm that visual stimuli are presented when they should be.
+    Use a photodiode to confirm that stimuli are presented when they should be.
     """
     targets = ['PsychoPy']
 
     categories = ['Validation']
     iconFile = Path(__file__).parent / 'photodiode_validator.png'
-    tooltip = _translate(
-        "Use a photodiode to confirm that visual stimuli are presented when they should be."
-    )
+    tooltip = _translate('Photodiode validator')
     deviceClasses = []
     version = "2025.1.0"
 
     def __init__(
             self,
             # basic
-            exp, name='visualVal',
-            variability="0.03", report="log",
+            exp, name='photodiode',
+            variability="1/60", report="log",
             findThreshold=True, threshold=127,
             # layout
             findDiode=True, diodePos="(1, 1)", diodeSize="(0.1, 0.1)", diodeUnits="norm",
@@ -335,7 +333,7 @@ class PhotodiodeValidatorRoutine(BaseValidatorRoutine, PluginDevicesMixin):
         code = (
             "# validate {name} start time\n"
             "if {name}.status == STARTED and %(name)s.status == STARTED:\n"
-            "    %(name)s.tStart, %(name)s.tStartDelay, %(name)s.tStartValid = %(name)s.validate(state=True, t={name}.tStartRefresh, adjustment=win.monitorFramePeriod)\n"
+            "    %(name)s.tStart, %(name)s.tStartValid = %(name)s.validate(state=True, t={name}.tStartRefresh)\n"
             "    if %(name)s.tStart is not None:\n"
             "        %(name)s.status = FINISHED\n"
         )
@@ -343,7 +341,6 @@ class PhotodiodeValidatorRoutine(BaseValidatorRoutine, PluginDevicesMixin):
             # save validated start time if stim requested
             code += (
             "        thisExp.addData('{name}.%(name)s.started', %(name)s.tStart)\n"
-            "        thisExp.addData('%(name)s.started.delay', %(name)s.tStartDelay)\n"
             )
         if self.params['saveValid']:
             # save validation result if params requested
@@ -356,7 +353,7 @@ class PhotodiodeValidatorRoutine(BaseValidatorRoutine, PluginDevicesMixin):
         code = (
             "# validate {name} stop time\n"
             "if {name}.status == FINISHED and %(name)s.status == STARTED:\n"
-            "    %(name)s.tStop, %(name)s.tStopDelay, %(name)s.tStopValid = %(name)s.validate(state=False, t={name}.tStopRefresh, adjustment=win.monitorFramePeriod)\n"
+            "    %(name)s.tStop, %(name)s.tStopValid = %(name)s.validate(state=False, t={name}.tStopRefresh)\n"
             "    if %(name)s.tStop is not None:\n"
             "        %(name)s.status = FINISHED\n"
         )
@@ -364,7 +361,6 @@ class PhotodiodeValidatorRoutine(BaseValidatorRoutine, PluginDevicesMixin):
             # save validated start time if stim requested
             code += (
             "        thisExp.addData('{name}.%(name)s.stopped', %(name)s.tStop)\n"
-            "        thisExp.addData('%(name)s.stopped.delay', %(name)s.tStopDelay)\n"
             )
         if self.params['saveValid']:
             # save validation result if params requested

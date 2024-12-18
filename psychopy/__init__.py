@@ -53,7 +53,7 @@ if 'installing' not in locals():
         # Custom environment variable for people using PsychoPy as a library,
         # who don't want to use the custom site-packages location. If set to 1,
         # this will disable the custom site-packages location. Packages will be
-        # installed in the default, system dependent user's site-packages
+        # installed in the default, system dependent user's site-packages 
         # location.
         useDefaultSite = os.environ['PSYCHOPYNOPACKAGES'] == '1'
 
@@ -61,30 +61,21 @@ if 'installing' not in locals():
     if not useDefaultSite:
         env = os.environ.copy()
         if 'PYTHONPATH' in env:  # append entries to existing PYTHONPATH
-            _userPackages = str(prefs.paths['packages'])
-            if _userPackages not in env['PYTHONPATH']:
-                env['PYTHONPATH'] = os.pathsep.join([
-                    env['PYTHONPATH'], _userPackages])
             _userSitePackages = str(prefs.paths['userPackages'])
             if _userSitePackages not in env['PYTHONPATH']:
                 env['PYTHONPATH'] = os.pathsep.join([
                     env['PYTHONPATH'], _userSitePackages])
+            _userPackages = str(prefs.paths['packages'])
+            if _userPackages not in env['PYTHONPATH']:
+                env['PYTHONPATH'] = os.pathsep.join([
+                    env['PYTHONPATH'], _userPackages]) 
         else:
             env['PYTHONPATH'] = os.pathsep.join([
-                str(prefs.paths['packages']),
-                str(prefs.paths['userPackages'])])
+                str(prefs.paths['userPackages']), 
+                str(prefs.paths['packages'])])
 
         # set user site packages
         env['PYTHONUSERBASE'] = prefs.paths['packages']
-
-        # set environment variable for pip to get egg-info of installed packages
-        if sys.platform == 'darwin':
-            # python 3.8 cannot parse the egg-info of zip-packaged dists
-            # correctly, so pip install will always install extra copies
-            # of dependencies. On python 3.10, we can force importlib to
-            # avoid this issue, but we need to use an environment variable
-            if sys.version_info >= (3, 10):
-                env['_PIP_USE_IMPORTLIB_METADATA'] = 'True'
 
         # update environment, pass this to sub-processes (e.g. pip)
         os.environ.update(env)

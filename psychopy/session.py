@@ -252,7 +252,7 @@ class Session:
             priorityThreshold=constants.priority.EXCLUDE+1,
             params=None,
             liaison=None,
-            restMsg="Rest"
+            restMsg="Rest..."
         ):
         # Store root and add to Python path
         self.root = Path(root)
@@ -273,8 +273,6 @@ class Session:
             dataDir / f"session_{wallTime}.log",
             level=getattr(logging, loggingLevel.upper())
         )
-        if liaison is not None:
-            liaison.logger.addTarget(self.logFile)
         # Store priority threshold
         self.priorityThreshold = priorityThreshold
         # Add experiments
@@ -726,7 +724,7 @@ class Session:
 
         return True
 
-    def setupWindowFromParams(self, params, measureFrameRate=False, recreate=True, blocking=True):
+    def setupWindowFromParams(self, params, measureFrameRate=False, blocking=True):
         """
         Create/setup a window from a dict of parameters
 
@@ -737,8 +735,6 @@ class Session:
             __init__ signature of psychopy.visual.Window
         measureFrameRate : bool
             If True, will measure frame rate upon window creation.
-        recreate : bool
-            If True, will close and recreate the window as needed
         blocking : bool
             Should calling this method block the current thread?
 
@@ -765,29 +761,6 @@ class Session:
                 params
             )
             return True
-        
-        # figure out whether we need to recreate the window
-        needsRecreate = False
-        for param in ("fullscr", "size", "pos", "screen"):
-            # skip params not specified
-            if param not in params:
-                continue
-            # skip all if there's no window
-            if self.win is None:
-                continue
-            # if param has changed, we'll need to recreate the window to apply it
-            if getattr(self.win, param) != params[param]:
-                needsRecreate = True
-                # if not allowed to recreate, warn
-                if not recreate:
-                    logging.warn(
-                        f"Changing Window.{param} requires the Window to be recreated, but "
-                        "`Session.setupWindowFromParams` was called with `recreate=False`."
-                    )
-        # if recreating, close window so we make a new one
-        if recreate and needsRecreate:
-            self.win.close()
-            self.win = None
 
         if self.win is None:
             # If win is None, make a Window
@@ -805,10 +778,8 @@ class Session:
         self.win.title = "PsychoPy Session"
         # Measure frame rate
         if measureFrameRate:
-            frameRate = self.getFrameRate(retest=True)
             expInfo = self.getCurrentExpInfo()
-            if expInfo is not False:
-                expInfo['frameRate'] = frameRate
+            expInfo['frameRate'] = self.win.getActualFrameRate()
 
         return True
 
@@ -1059,8 +1030,6 @@ class Session:
         logging.info(_translate(
             "Running experiment via Session: name={key}, expInfo={expInfo}"
         ).format(key=key, expInfo=expInfo))
-        # reset session clock
-        self.sessionClock.reset()
         # Run this experiment
         try:
             self.experiments[key].run(
@@ -1202,31 +1171,6 @@ class Session:
             )
         
         return trials
-    
-    def pauseLoop(self):
-        """
-        Pause the current loop of the current experiment. Note that this will not take effect until 
-        the loop would next iterate.
-
-        Returns
-        -------
-        bool or None
-            True if the operation completed successfully
-        """
-        # warn and return failed if no experiment is running
-        if self.currentExperiment is None:
-            logging.warn(_translate(
-                "Could not pause loop as there is no experiment running."
-            ))
-            return False
-        # warn and return failed if not in a loop
-        if self.currentExperiment.currentLoop is self.currentExperiment:
-            logging.warn(_translate(
-                "Could not pause loop as the current experiment is not in a loop."
-            ))
-            return False
-        # pause loop
-        self.currentExperiment.currentLoop.status = constants.PAUSED
 
     def pauseExperiment(self):
         """
@@ -1305,7 +1249,7 @@ class Session:
         if self.currentExperiment is None:
             return
         # skip trials in current loop
-        return self.currentExperiment.skipTrials(n)
+        self.currentExperiment.skipTrials(n)
 
     def rewindTrials(self, n=1):
         """
@@ -1326,7 +1270,7 @@ class Session:
         if self.currentExperiment is None:
             return
         # rewind trials in current loop
-        return self.currentExperiment.rewindTrials(n)
+        self.currentExperiment.rewindTrials(n)
 
     def saveExperimentData(self, key, thisExp=None, blocking=True):
         """

@@ -1,5 +1,5 @@
 
-lastFrame = string(default='builder-coder-runner')
+lastFrame = string(default='both')
 skipVersion=string(default='')  #skipping any updates of this version
 tipIndex = integer(default=0)
 flowSize = integer(0,2,default=2)

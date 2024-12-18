@@ -6,8 +6,7 @@
 from ctypes import cdll
 
 from . import MouseDevice
-from .. import Computer, Device, xlib
-from ..keyboard import Keyboard
+from .. import Keyboard, Computer, Device, xlib
 from ...constants import MouseConstants
 from ...errors import print2err, printExceptionDetailsToStdErr
 

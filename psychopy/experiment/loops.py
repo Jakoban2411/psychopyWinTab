@@ -216,15 +216,8 @@ class TrialHandler(_BaseLoopHandler):
         # then run the trials loop
         code = "\nfor %s in %s:\n"
         buff.writeIndentedLines(code % (self.thisName, self.params['name']))
-        buff.setIndentLevel(1, relative=True)
-        # mark current trial as started
-        code = (
-            "%(name)s.status = STARTED\n"
-            "if hasattr(%(loopIndex)s, 'status'):\n"
-            "    %(loopIndex)s.status = STARTED\n"
-        )
-        buff.writeIndentedLines(code % inits)
         # fetch parameter info from conditions
+        buff.setIndentLevel(1, relative=True)
         code = (
             "currentLoop = %(name)s\n"
             "thisExp.timestampOnFlip(win, 'thisRow.t', format=globalClock.format)\n"
@@ -352,28 +345,7 @@ class TrialHandler(_BaseLoopHandler):
         )
 
     def writeLoopEndCode(self, buff):
-        # copy params so we can safely add to it
-        params = self.params.copy()
-        # add param for current trial name
-        params['thisName'] = self.thisName
-        # mark current trial as finished at end of each iteration
-        code = (
-            "# mark %(thisName)s as finished\n"
-            "if hasattr(%(thisName)s, 'status'):\n"
-            "    %(thisName)s.status = FINISHED\n"
-            "# if awaiting a pause, pause now\n"
-            "if %(name)s.status == PAUSED:\n"
-            "    thisExp.status = PAUSED\n"
-            "    pauseExperiment(\n"
-            "        thisExp=thisExp, \n"
-            "        win=win, \n"
-            "        timers=[globalClock], \n"
-            "    )\n"
-            "    # once done pausing, restore running status\n"
-            "    %(name)s.status = STARTED"
-        )
-        buff.writeIndentedLines(code % params)
-        # just within the loop advance data line if loop is whole trials
+        # Just within the loop advance data line if loop is whole trials
         if self.params['isTrials'].val == True:
             buff.writeIndentedLines(
                 "thisExp.nextEntry()\n"
@@ -381,13 +353,9 @@ class TrialHandler(_BaseLoopHandler):
             )
         # end of the loop. dedent
         buff.setIndentLevel(-1, relative=True)
-        # mark finished
-        code = (
-            "# completed %(nReps)s repeats of '%(name)s'\n"
-            "%(name)s.status = FINISHED\n"
-            "\n"
-        )
-        buff.writeIndentedLines(code % params)
+        buff.writeIndented("# completed %s repeats of '%s'\n"
+                           % (self.params['nReps'], self.params['name']))
+        buff.writeIndented("\n")
         # save data
         if self.params['isTrials'].val:
             # send final data to Liaison

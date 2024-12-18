@@ -8,7 +8,6 @@
 # Distributed under the terms of the GNU General Public License (GPL).
 import importlib
 from psychopy import logging, data
-from psychopy.tools.arraytools import IndexDict
 from . import util
 
 haveQt = False  # until we confirm otherwise
@@ -168,7 +167,7 @@ class Dlg(QtWidgets.QDialog):
         self.inputFields = []
         self.inputFieldTypes = {}
         self.inputFieldNames = []
-        self.data = IndexDict()
+        self.data = {}
         self.irow = 0
         self.pos = pos
         # QtWidgets.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
@@ -230,8 +229,8 @@ class Dlg(QtWidgets.QDialog):
 
         return textLabel
 
-    def addField(self, key, initial='', color='', choices=None, tip='',
-                 required=False, enabled=True, label=None):
+    def addField(self, key, label='', initial='', color='', choices=None, tip='',
+                 required=False, enabled=True):
         """Adds a (labelled) input field to the dialogue box,
         optional text color and tooltip.
 
@@ -241,10 +240,6 @@ class Dlg(QtWidgets.QDialog):
 
         Returns a handle to the field (but not to the label).
         """
-        # if not given a label, use key (sans-pipe syntax)
-        if label is None:
-            label, _ = util.parsePipeSyntax(key)
-
         self.inputFieldNames.append(label)
         if choices:
             self.inputFieldTypes[label] = str
@@ -350,9 +345,9 @@ class Dlg(QtWidgets.QDialog):
         # set required (attribute is checked later by validate fcn)
         inputBox.required = required
 
-        if color is not None and len(color):
+        if len(color):
             inputBox.setPalette(inputLabel.palette())
-        if tip is not None and len(tip):
+        if len(tip):
             inputBox.setToolTip(tip)
         inputBox.setEnabled(enabled)
         self.layout.addWidget(inputBox, self.irow, 1)
@@ -372,10 +367,8 @@ class Dlg(QtWidgets.QDialog):
         """Adds a field to the dialog box (like addField) but the field cannot
         be edited. e.g. Display experiment version.
         """
-        return self.addField(
-            key=key, label=label, initial=initial, color=color, choices=choices, tip=tip, 
-            enabled=False
-        )
+        return self.addField(key, label, initial, color, choices, tip,
+                             enabled=False)
 
     def addReadmoreCtrl(self):
         line = ReadmoreCtrl(self, label=_translate("Configuration fields..."))

@@ -25,21 +25,10 @@ class BuilderFindDlg(wx.Dialog):
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.border.Add(self.sizer, border=12, proportion=1, flag=wx.EXPAND | wx.ALL)
 
-        # create search box and checkbox sizer
-        searchSizer = wx.BoxSizer(wx.VERTICAL)
-
         # create search box
         self.termCtrl = wx.SearchCtrl(self)
-        self.termCtrl.Bind(wx.EVT_TEXT, self.onSearchTyping)
-        searchSizer.Add(self.termCtrl, flag=wx.EXPAND | wx.BOTTOM, border=6)
-
-        # Add checkbox for case sensitivity
-        self.caseSensitiveCheckbox = wx.CheckBox(self, label=_translate("Case sensitive"))
-        self.caseSensitiveCheckbox.Bind(wx.EVT_CHECKBOX, self.onSearchTyping)
-        searchSizer.Add(self.caseSensitiveCheckbox, flag=wx.BOTTOM, border=6)
-
-        # Add the search sizer to the main sizer
-        self.sizer.Add(searchSizer, flag=wx.EXPAND | wx.ALL, border=6)
+        self.termCtrl.Bind(wx.EVT_SEARCH, self.onSearch)
+        self.sizer.Add(self.termCtrl, border=6, flag=wx.EXPAND | wx.ALL)
 
         # create results box
         self.resultsCtrl = utils.ListCtrl(self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
@@ -77,26 +66,22 @@ class BuilderFindDlg(wx.Dialog):
     def resetListCtrl(self):
         self.resultsCtrl.ClearAll()
         self.resultsCtrl.AppendColumn(_translate("Component"), width=120)
-        self.resultsCtrl.AppendColumn(_translate("Routine"), width=120)  # Moved to second position
         self.resultsCtrl.AppendColumn(_translate("Parameter"), width=120)
         self.resultsCtrl.AppendColumn(_translate("Value"), width=-1)
         self.resultsCtrl.resizeLastColumn(minWidth=120)
         self.selectedResult = None
 
-    def onSearchTyping(self, evt):
-        term = self.termCtrl.GetValue()
-        case_sensitive = self.caseSensitiveCheckbox.GetValue()
-        
+    def onSearch(self, evt):
+        # get term to search
+        term = evt.GetString()
         if term:
             # get locations of term in experiment
-            self.results = getParamLocations(self.exp, term=term, case_sensitive=case_sensitive)
+            self.results = getParamLocations(self.exp, term=term)
         else:
             # return nothing for blank string
             self.results = []
-
         # clear old output
         self.resetListCtrl()
-
         # show new output
         for result in self.results:
             # unpack result
@@ -106,11 +91,11 @@ class BuilderFindDlg(wx.Dialog):
             if "\n" in val:
                 # if multiline, show first line with match
                 for line in val.split("\n"):
-                    if (term in line) if case_sensitive else (term.lower() in line.lower()):
+                    if self.termCtrl.GetValue() in line:
                         val = line
                         break
             # construct entry
-            entry = [comp.name, rt.name, param.label, val]
+            entry = [comp.name, param.label, val]
             # add entry
             self.resultsCtrl.Append(entry)
             # set image for comp
@@ -118,13 +103,10 @@ class BuilderFindDlg(wx.Dialog):
                 item=self.resultsCtrl.GetItemCount()-1,
                 image=self.imageMap[type(comp)]
             )
-        
         # size
         self.resultsCtrl.Layout()
         # disable Go button until item selected
         self.okBtn.Disable()
-
-        evt.Skip()
 
     def onSelectResult(self, evt):
         if evt.GetEventType() == wx.EVT_LIST_ITEM_SELECTED.typeId:
@@ -145,7 +127,7 @@ class BuilderFindDlg(wx.Dialog):
         if self.selectedResult is None:
             return
         # do usual OK button stuff
-        # self.Close()
+        self.Close()
         # unpack
         rt, comp, paramName, param = self.selectedResult
         # navigate to routine
@@ -155,8 +137,7 @@ class BuilderFindDlg(wx.Dialog):
         if isinstance(comp, experiment.components.BaseComponent):
             # if we have a component, open its dialog and navigate to categ page
             if hasattr(comp, 'type') and comp.type.lower() == 'code':
-                # For code components, we need to find the index of the page
-                openToPage = list(comp.params.keys()).index(paramName)
+                openToPage = paramName
             else:
                 openToPage = param.categ
             page.editComponentProperties(component=comp, openToPage=openToPage)
@@ -165,7 +146,8 @@ class BuilderFindDlg(wx.Dialog):
             i = page.ctrls.getCategoryIndex(param.categ)
             page.ctrls.ChangeSelection(i)
 
-def getParamLocations(exp, term, case_sensitive=False):
+
+def getParamLocations(exp, term):
     """
     Get locations of params containing the given term.
 
@@ -180,22 +162,15 @@ def getParamLocations(exp, term, case_sensitive=False):
         List of tuples, with each tuple functioning as a path to the found
         param
     """
-
     # array to store results in
     found = []
-
-    def compareStrings(text, term, case_sensitive):
-        if case_sensitive:
-            return term in text
-        else:
-            return term.lower() in text.lower()
 
     # go through all routines
     for rt in exp.routines.values():
         if isinstance(rt, experiment.routines.BaseStandaloneRoutine):
             # find in standalone routine
             for paramName, param in rt.params.items():
-                if compareStrings(str(param.val), term, case_sensitive):
+                if term in str(param.val):
                     # append path (routine -> param)
                     found.append(
                         (rt, rt, paramName, param)
@@ -204,13 +179,11 @@ def getParamLocations(exp, term, case_sensitive=False):
             # find in regular routine
             for comp in rt:
                 for paramName, param in comp.params.items():
-                    if compareStrings(str(param.val), term, case_sensitive):
+                    if term in str(param.val):
                         # append path (routine -> component -> param)
                         found.append(
                             (rt, comp, paramName, param)
                         )
 
     return found
-
-
 

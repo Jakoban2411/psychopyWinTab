@@ -26,18 +26,10 @@ class StaticComponent(BaseComponent):
     tooltip = _translate('Static: Static screen period (e.g. an ISI). '
                          'Useful for pre-loading stimuli.')
 
-    def __init__(
-            self, exp, parentName, 
-            # basic
-            name='ISI',
-            startType='time (s)', startVal=0.0,
-            stopType='duration (s)', stopVal=0.5,
-            startEstim='', durationEstim='',
-            # custom
-            code="",
-            # data
-            saveData=False
-        ):
+    def __init__(self, exp, parentName, name='ISI',
+                 startType='time (s)', startVal=0.0,
+                 stopType='duration (s)', stopVal=0.5,
+                 startEstim='', durationEstim=''):
         BaseComponent.__init__(
             self, exp, parentName, name=name,
             startType=startType, startVal=startVal,
@@ -47,26 +39,11 @@ class StaticComponent(BaseComponent):
         self.updatesList = []  # a list of dicts {compParams, fieldName}
         self.type = 'Static'
         self.url = "https://www.psychopy.org/builder/components/static.html"
-        # --- Custom params ---
-        self.order += [
-            "code",
-            "saveData",
-        ]
-        self.params['code'] = Param(
-            code, valType='code', inputType="multi", categ='Custom',
-            label=_translate("Custom code"),
-            hint=_translate(
-                "Custom code to be run during the static period (after updates)"
-            )
-        )
-        self.params['saveData'] = Param(
-            saveData, valType="code", inputType="bool", categ="Custom",
-            label=_translate("Save data during"),
-            hint=_translate(
-                "While the frame loop is paused, should we take the opportunity to save data now? "
-                "This is only relevant locally, online data saving is either periodic or on close."
-            )
-        )
+        hnt = _translate(
+            "Custom code to be run during the static period (after updates)")
+        self.params['code'] = Param("", valType='code', inputType="multi", categ='Custom',
+                                    hint=hnt,
+                                    label=_translate("Custom code"))
 
     def addComponentUpdate(self, routine, compName, fieldName):
         self.updatesList.append({'compName': compName,
@@ -192,21 +169,9 @@ class StaticComponent(BaseComponent):
                 msg = ("Couldn't deduce end point for startType=%(startType)s, "
                        "stopType=%(stopType)s")
                 raise Exception(msg % self.params)
-            # save data
-            if self.params['saveData']:
-                code = (
-                    "# take the opportunity to save data file now (to be updated later)\n"
-                    "_%(name)sLastFileNames = thisExp.save()\n"
-                    "thisExp.queueNextCollision('overwrite', fileName=_%(name)sLastFileNames)\n"
-                )
-                buff.writeIndentedLines(code % self.params)
-            # start static
-            code = (
-                "# start the static period\n"
-                "%(name)s.start({})\n"
-            ).format(durationSecsStr)
-            buff.writeIndentedLines(code % self.params)
-        
+            vals = (self.params['name'], durationSecsStr)
+            buff.writeIndented("%s.start(%s)\n" % vals)
+
         return needsUnindent
 
     def writeStopTestCode(self, buff):

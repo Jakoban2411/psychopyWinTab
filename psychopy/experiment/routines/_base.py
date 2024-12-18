@@ -680,6 +680,16 @@ class Routine(list):
                 '\n# --- Run Routine "{name}" ---\n')
         buff.writeIndentedLines(code.format(name=self.name,
                                             clockName=self._clockName))
+        # check for the trials loop ending this Routine
+        if len(self.exp.flow._loopList):
+            loop = self.exp.flow._loopList[-1]
+            code = (
+                "# if trial has changed, end Routine now\n"
+                "if isinstance({name}, data.TrialHandler2) and {thisName}.thisN != {"
+                "name}.thisTrial.thisN:\n"
+                "    continueRoutine = False\n"
+            ).format(name=loop.name, thisName=loop.thisName)
+            buff.writeIndentedLines(code)
 
         # initial value for forceRoutineEnded (needs to happen now as Code components will have executed
         # their Begin Routine code)
@@ -695,15 +705,6 @@ class Routine(list):
         buff.writeIndented(code)
 
         buff.setIndentLevel(1, True)
-        # check for the trials loop ending this Routine
-        if len(self.exp.flow._loopList):
-            loop = self.exp.flow._loopList[-1]
-            code = (
-                "# if trial has changed, end Routine now\n"
-                "if hasattr({thisName}, 'status') and {thisName}.status == STOPPING:\n"
-                "    continueRoutine = False\n"
-            ).format(thisName=loop.thisName)
-            buff.writeIndentedLines(code)
         # on each frame
         code = ('# get current time\n'
                 't = {clockName}.getTime()\n'
@@ -753,7 +754,7 @@ class Routine(list):
             "    pauseExperiment(\n"
             "        thisExp=thisExp, \n"
             "        win=win, \n"
-            "        timers=[routineTimer, globalClock], \n"
+            "        timers=[routineTimer], \n"
             "        playbackComponents=[{playbackComponentsStr}]\n"
             "    )\n"
             "    # skip the frame we paused on\n"
@@ -823,6 +824,7 @@ class Routine(list):
         code = ("TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date\n\n"
                 "//--- Prepare to start Routine '%(name)s' ---\n"
                 "t = 0;\n"
+                "%(name)sClock.reset(); // clock\n"
                 "frameN = -1;\n"
                 "continueRoutine = true; // until we're told otherwise\n"
                 % self.params)
@@ -830,17 +832,7 @@ class Routine(list):
         # can we use non-slip timing?
         maxTime, useNonSlip = self.getMaxTime()
         if useNonSlip:
-            code = (
-                "%(name)sClock.reset(routineTimer.getTime());\n"
-                "routineTimer.add({maxTime:f});\n"
-            ).format(maxTime=maxTime)
-            buff.writeIndentedLines(code % self.params)
-        else:
-            code = (
-                "%(name)sClock.reset();\n"
-                "routineTimer.reset();\n"
-            )
-            buff.writeIndentedLines(code % self.params)
+            buff.writeIndented('routineTimer.add(%f);\n' % (maxTime))
         # keep track of whether max duration is reached
         code = (
             "%(name)sMaxDurationReached = false;\n"
@@ -1016,9 +1008,9 @@ class Routine(list):
         if useNonSlip:
             code = (
                 "if (%(name)sMaxDurationReached) {{\n"
-                "    %(name)sClock.add(%(name)sMaxDuration);\n"
+                "    routineTimer.add(%(name)sMaxDuration);\n"
                 "}} else {{\n"
-                "    %(name)sClock.add({:f});\n"
+                "    routineTimer.add(-{:f});\n"
                 "}}\n"
             ).format(maxTime)
             buff.writeIndented(code % self.params)
@@ -1086,8 +1078,8 @@ class Routine(list):
                     nonSlipSafe = False
                 if duration == FOREVER:
                     # only the *start* of an unlimited event should contribute
-                    # to maxTime, plus some minimal duration so it's visible
-                    duration = 0 if self.settings.params['forceNonSlip'] else 1
+                    # to maxTime
+                    duration = 0  # plus some minimal duration so it's visible
                 # now see if we have a end t value that beats the previous max
                 try:
                     # will fail if either value is not defined:

@@ -1,12 +1,12 @@
 from pathlib import Path
 
 from psychopy import visual, colors, core
-from .test_basevisual import _TestUnitsMixin, _TestSerializationMixin
+from .test_basevisual import _TestUnitsMixin
 from psychopy.tests.test_experiment.test_component_compile_python import _TestBoilerplateMixin
 from psychopy.tests import utils
 import pytest
 
-class TestImage(_TestUnitsMixin, _TestBoilerplateMixin, _TestSerializationMixin):
+class TestImage(_TestUnitsMixin, _TestBoilerplateMixin):
     """
     Test that images render as expected. Note: In BaseVisual tests, image colors will look different than
     seems intuitive as foreColor will be set to `"blue"`.

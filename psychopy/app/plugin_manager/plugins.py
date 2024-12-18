@@ -1,5 +1,4 @@
 from pathlib import Path
-from packaging.version import Version
 import shutil
 
 import wx
@@ -210,12 +209,12 @@ class PluginInfo:
             current.remove(self.pipname)
         plugins.startUpPlugins(current, add=False, verify=False)
 
-    def install(self, forceReinstall=False):
+    def install(self):
         if self.parent is None:
             return
 
         wx.CallAfter(
-            self.parent.GetTopLevelParent().installPlugin, self, forceReinstall=forceReinstall)
+            self.parent.GetTopLevelParent().installPlugin, self)
 
     def uninstall(self):
         if self.parent is None:
@@ -227,23 +226,6 @@ class PluginInfo:
     @property
     def installed(self):
         return pkgtools.isInstalled(self.pipname)
-
-    @property
-    def installedVersion(self):
-        """
-        Returns
-        -------
-        Version or None
-            The version of this plugin which is installed, or None if it is not installed.
-        """
-        if self.installed:
-            try:
-                ver = plugins.pluginMetadata(self.pipname)["Version"]
-                return Version(ver)
-            except:
-                return None
-        else:
-            return None
 
     @property
     def author(self):
@@ -261,28 +243,6 @@ class PluginInfo:
         else:
             # Otherwise, assume no author
             self._author = AuthorInfo()
-    
-    def getReleases(self):
-        """
-        Get known versions of this plugin.
-
-        Returns
-        -------
-        list[str]
-            List of version strings
-        """
-        # get package info
-        info = pkgtools.getPypiInfo(self.pipname, silence=True)
-        # convert all release numbers to Version objects
-        releases = []
-        for release in info.get('releases', []):
-            try:
-                ver = Version(release)
-                releases.append(ver)
-            except:
-                continue
-        
-        return releases
 
 
 class PluginManagerPanel(wx.Panel, handlers.ThemeMixin):
@@ -804,13 +764,6 @@ class PluginDetailsPanel(wx.Panel, handlers.ThemeMixin):
         self.installBtn.SetBitmapMargins(6, 3)
         self.installBtn.Bind(wx.EVT_BUTTON, self.onInstall)
         self.buttonSizer.Add(self.installBtn, border=3, flag=wx.ALL | wx.EXPAND)
-        # update btn
-        self.updateBtn = wx.Button(self, label=_translate("Update"))
-        self.updateBtn.SetBitmap(
-            icons.ButtonIcon("plus", 16).bitmap
-        )
-        self.updateBtn.Bind(wx.EVT_BUTTON, self.onUpdate)
-        self.buttonSizer.Add(self.updateBtn, border=3, flag=wx.ALL | wx.EXPAND)
         # uninstall btn
         self.uninstallBtn = wx.Button(self, label=_translate("Uninstall"))
         self.uninstallBtn.SetBitmap(
@@ -914,14 +867,14 @@ class PluginDetailsPanel(wx.Panel, handlers.ThemeMixin):
             active=active
         )
 
-    def _doInstall(self, forceReinstall=None):
+    def _doInstall(self):
         """Routine to run the installation of a package after the `onInstall`
         event is processed.
         """
         # mark as pending
         self.markInstalled(None)
         # install
-        self.info.install(forceReinstall=forceReinstall)
+        self.info.install()
         # mark according to install success
         self.markInstalled(self.info.installed)
     
@@ -937,11 +890,6 @@ class PluginDetailsPanel(wx.Panel, handlers.ThemeMixin):
         """Event called when the install button is clicked.
         """
         wx.CallAfter(self._doInstall)  # call after processing button events
-        if evt is not None and hasattr(evt, 'Skip'):
-            evt.Skip()
-    
-    def onUpdate(self, evt=None):
-        wx.CallAfter(self._doInstall, forceReinstall=True)  # call after processing button events
         if evt is not None and hasattr(evt, 'Skip'):
             evt.Skip()
     
@@ -1045,12 +993,6 @@ class PluginDetailsPanel(wx.Panel, handlers.ThemeMixin):
         self.pipName.SetLabelText(value.pipname)
         # Set installed
         self.markInstalled(value.installed)
-        # show/hide update button
-        releases = self.info.getReleases()
-        if releases:
-            self.updateBtn.Show(
-                self.info.installed and self.info.installedVersion < max(releases)
-            )
         # Enable/disable homepage
         self.homepageBtn.Enable(bool(self.info.homepage))
         # Set activated

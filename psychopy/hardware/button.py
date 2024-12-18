@@ -140,7 +140,7 @@ class KeyboardButtonBox(BaseButtonGroup):
     def parseMessage(self, message):
         # work out time and state state of KeyPress
         state = message.duration is None
-        t = message.rt
+        t = message.tDown
         # if state is a release, add duration to timestamp
         if message.duration:
             t += message.duration
@@ -161,7 +161,7 @@ class KeyboardButtonBox(BaseButtonGroup):
 
     def isSameDevice(self, other):
         # all Keyboards are the same device
-        return isinstance(other, (KeyboardButtonBox, dict))
+        return True
 
 
 class ButtonBox:

@@ -14,8 +14,7 @@ __all__ = [
 
 import json
 import inspect
-import numpy as np
-from psychopy import logging
+import time
 
 
 class BaseResponse:
@@ -25,8 +24,7 @@ class BaseResponse:
     # list of fields known to be a part of this response type
     fields = ["t", "value"]
 
-    def __init__(self, t, value, device=None):
-        self.device = device
+    def __init__(self, t, value):
         self.t = t
         self.value = value
 
@@ -34,50 +32,22 @@ class BaseResponse:
         # make key=val strings
         attrs = []
         for key in self.fields:
-            try:
-                attrs.append(f"{key}={getattr(self, key)}")
-            except:
-                continue
+            attrs.append(f"{key}={getattr(self, key)}")
         attrs = ", ".join(attrs)
         # construct
-        try:
-            return f"<{type(self).__name__} from {self.getDeviceName()}: {attrs}>"
-        except:
-            return f"<{type(self).__name__}: {attrs}>"
-    
-    def getDeviceName(self):
-        # if device isn't a device, and this method isn't overloaded, return None
-        if not hasattr(self.device, "getDeviceProfile"):
-            return None
-        # get profile
-        deviceProfile = self.device.getDeviceProfile()
-        # get name from profile
-        if "deviceName" in deviceProfile:
-            return deviceProfile['deviceName']
-        else:
-            # if profile doesn't include name, use class name
-            return type(self.device).__name__
+        return f"<{type(self).__name__}: {attrs}>"
 
     def getJSON(self):
         import json
-        # get device profile
-        deviceProfile = None
-        if hasattr(self.device, "getDeviceProfile"):
-            deviceProfile = self.device.getDeviceProfile()
         # construct message as dict
         message = {
             'type': "hardware_response",
             'class': type(self).__name__,
-            'device': deviceProfile,
             'data': {}
         }
         # add all fields to "data"
         for key in self.fields:
             message['data'][key] = getattr(self, key)
-            # sanitize numpy arrays
-            if isinstance(message['data'][key], np.ndarray):
-                message['data'][key] = message['data'][key].tolist()
-
 
         return json.dumps(message)
 
@@ -86,9 +56,6 @@ class BaseDevice:
     """
     Base class for device interfaces, includes support for DeviceManager and adding listeners.
     """
-    # start off with no cached profile
-    _profile = None
-    
     def __init_subclass__(cls, aliases=None):
         from psychopy.hardware.manager import DeviceManager
         # handle no aliases
@@ -120,20 +87,15 @@ class BaseDevice:
         dict
             Dictionary representing this device
         """
-        # only iteratively find it if we haven't done so already
-        if self._profile is None:
-            # get class string
-            cls = type(self)
-            mro = inspect.getmodule(cls).__name__ + "." + cls.__name__
-            # iterate through available devices for this class
-            for profile in self.getAvailableDevices():
-                if self.isSameDevice(profile):
-                    # if current profile is this device, add deviceClass and return it
-                    profile['deviceClass'] = mro
-                    self._profile = profile
-                    break
-        
-        return self._profile
+        # get class string
+        cls = type(self)
+        mro = inspect.getmodule(cls).__name__ + "." + cls.__name__
+        # iterate through available devices for this class
+        for profile in self.getAvailableDevices():
+            if self.isSameDevice(profile):
+                # if current profile is this device, add deviceClass and return it
+                profile['deviceClass'] = mro
+                return profile
 
     def getJSON(self, asString=True):
         """
@@ -200,8 +162,6 @@ class BaseResponseDevice(BaseDevice):
         self.listeners = []
         # list to store responses in
         self.responses = []
-        # list to store callbacks against their triggering event
-        self.callbacks = []
         # indicator to mute outside of registered apps
         self.muteOutsidePsychopy = False 
 
@@ -226,79 +186,6 @@ class BaseResponseDevice(BaseDevice):
         raise NotImplementedError(
             "All subclasses of BaseDevice must implement the method `parseMessage`"
         )
-       
-    def registerCallback(self, response, func, args=None, kwargs=None):
-        """
-        Register a function to be executed automatically when this device receives a response with 
-        the matching value.
-
-        Parameters
-        ----------
-        response : *
-            Can be either:
-                - A value which will return True when compared via `==` to the desired response 
-                object, e.g. "q" to register a callback with KeyboardDevice when the q key is 
-                pressed
-                - A method which takes an incoming BaseResponse object as its input and returns 
-                True/False. Keep in mind this will be executed every time a response is received -
-                this function should be fast, otherwise you could significantly damage your timing!
-        func : function
-            Function to call when a matching response is received.
-        args : tuple, optional
-            List of positional arguments to call the function with, leave blank to give no 
-            positional arguments.
-        kwargs : dict, optional
-            Dict of keyword arguments to call the function with, leave blank to give no keyword 
-            arguments.
-        desc : str, optional
-            A helpful string describing what the callback does (e.g. "End the experiment")
-        """
-        
-        if callable(response):
-            # if response is callable, use it for query
-            query = response
-        else:
-            # otherwise, make a callable to check against incoming value
-            if self.responseClass.__eq__ is object.__eq__:
-                # warn if this device's responses aren't comparable via ==
-                logging.warn(
-                    "{clsName} received {respName} objects, which cannot be compared via `==`. "
-                    "This callback is likely to error when executed."
-                    .format(clsName=type(self).__name__, respName=self.responseClass.__name__)
-                )
-            # define a basic query and use it for the response query
-            def _callbackQuery(message: BaseResponse):
-                return message == response
-            query = _callbackQuery
-        # handle no args and no kwargs
-        if args is None:
-            args = []
-        if kwargs is None:
-            kwargs = {}
-        # store a dict profile for this callback
-        self.callbacks.append({
-            'query': query,
-            'func': func,
-            'args': args,
-            'kwargs': kwargs
-        })
-    
-    def checkCallbacks(self, message):
-        """
-        Check whether a received message should trigger any registered callback functions (see 
-        `.registerCallback`) and, if so, execute them.
-
-        Parameters
-        ----------
-        message : BaseResponse
-            Received response to query callbacks for
-        """
-        # check all registered callbacks
-        for callback in self.callbacks:
-            # call query function
-            if callback['query'](message):
-                # if True, execute callback
-                return callback['func'](*callback['args'], **callback['kwargs'])
 
     def receiveMessage(self, message):
         """
@@ -325,20 +212,9 @@ class BaseResponseDevice(BaseDevice):
         ).format(ownType=type(self).__name__, targetType=self.responseClass.__name__, msgType=type(message).__name__)
         # add message to responses
         self.responses.append(message)
-        # execute relevant callbacks
-        self.checkCallbacks(message)
         # relay message to listener
         for listener in self.listeners:
             listener.receiveMessage(message)
-        # relay to log file
-        try:
-            logging.exp(
-                f"Device response: {message}"
-            )
-        except Exception as err:
-            logging.error(
-                f"Received a response from a {type(self).__name__} but couldn't print it: {err}"
-            )
 
         return True
 
@@ -447,10 +323,9 @@ class BaseResponseDevice(BaseDevice):
         bool
             True if completed successfully
         """
-        # remove self from listener loop
+        # remove listeners from loop
         for listener in self.listeners:
-            if self in listener.loop.devices:
-                listener.loop.removeDevice(self)
+            listener.loop.removeDevice(listener)
         # clear list
         self.listeners = []
 

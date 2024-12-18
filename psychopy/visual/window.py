@@ -497,7 +497,7 @@ class Window():
 
         # parameters for transforming the overall view
         self.viewScale = val2array(viewScale)
-        if viewPos is not None and self.units is None:
+        if self.viewPos is not None and self.units is None:
             raise ValueError('You must define the window units to use viewPos')
         self.viewPos = val2array(viewPos, withScalar=False)
         self.viewOri = float(viewOri)
@@ -750,17 +750,13 @@ class Window():
     def setViewPos(self, value, log=True):
         setAttribute(self, 'viewPos', value, log=log)
 
-    @property
-    def fullscr(self):
-        """Return whether the window is in fullscreen mode."""
-        return self._isFullScr
-
-    @fullscr.setter
+    @attributeSetter
     def fullscr(self, value):
         """Set whether fullscreen mode is `True` or `False` (not all backends
         can toggle an open window).
         """
         self.backend.setFullScr(value)
+        self.__dict__['fullscr'] = value
         self._isFullScr = value
 
     @attributeSetter
@@ -1190,10 +1186,6 @@ class Window():
                 # handle dragging
                 if getattr(thisStim, "draggable", False):
                     thisStim.doDragging()
-                    
-                if getattr(thisStim, "clickable", False):
-                    thisStim.doPointerActions()
-
         else:
             self.backend.setCurrent()
 
@@ -1328,12 +1320,10 @@ class Window():
         self._frameTime = now = logging.defaultClock.getTime()
         self._frameTimes.append(self._frameTime)
 
-        # run scheduled functions immediately after flip completes
-        n_items = len(self._toCall)
-        for i in range(n_items):
-            self._toCall[i]['function'](*self._toCall[i]['args'], **self._toCall[i]['kwargs'])
-        # leave newly scheduled functions for next flip
-        del self._toCall[:n_items]
+        # run other functions immediately after flip completes
+        for callEntry in self._toCall:
+            callEntry['function'](*callEntry['args'], **callEntry['kwargs'])
+        del self._toCall[:]
 
         # do bookkeeping
         if self.recordFrameIntervals:
@@ -3341,12 +3331,7 @@ class Window():
         GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
         return True
 
-    @property
-    def mouseVisible(self):
-        """Returns the visibility of the mouse cursor."""
-        return self.backend.mouseVisible
-
-    @mouseVisible.setter
+    @attributeSetter
     def mouseVisible(self, visibility):
         """Sets the visibility of the mouse cursor.
 
@@ -3360,6 +3345,7 @@ class Window():
 
         """
         self.backend.setMouseVisibility(visibility)
+        self.__dict__['mouseVisible'] = visibility
 
     def setMouseVisible(self, visibility, log=None):
         """Usually you can use 'stim.attribute = value' syntax instead,

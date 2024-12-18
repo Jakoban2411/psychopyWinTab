@@ -100,7 +100,7 @@ class WintabBrushComponent(BaseVisualComponent):
             "   print(\"Error creating Wintab device:\", pen.getInterfaceStatus()) \n"
             "   print(\"TABLET INIT ERROR:\", pen.getLastInterfaceErrorString()) \n"
             "   return \n"
-            "pen.reporting = True \n"
+            "pen.reporting = False \n"
         ).format(**inits)
         
         buff.writeIndentedLines(code)
@@ -149,15 +149,23 @@ class WintabBrushComponent(BaseVisualComponent):
     def writeRoutineStartCode(self, buff):
         # Write the code that will be called at the start of the routine
         super(WintabBrushComponent, self).writeRoutineStartCode(buff)
-        code = ("")
+        code = ("{name}.isReporting = True \n"
+                "pen.reporting = {name}.isReporting \n").format(name=self.params['name'])
         # Reset shapes for each trial
         buff.writeIndented("{}.reset()\n".format(self.params['name']))
+        buff.writeIndented(code)
 
     def writeRoutineStartCodeJS(self, buff):
         # Write the code that will be called at the start of the routine
         # super(BrushComponent, self).writeRoutineStartCodeJS(buff)
         # Reset shapes for each trial
         buff.writeIndented("{}Reset();\n".format(self.params['name']))
+
+    def writeRoutineEndCode(self, buff):
+        super(WintabBrushComponent, self).writeRoutineEndCode(buff)
+        code = ("{name}.isReporting = False \n"
+                "pen.reporting = {name}.isReporting \n").format(name=self.params['name'])
+        buff.writeIndented(code)
 
     def writeFrameCode(self, buff):
         # Write the code that will be called every frame

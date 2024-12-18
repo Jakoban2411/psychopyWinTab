@@ -1,18 +1,17 @@
+import json
 from psychopy import core, layout, logging
 from psychopy.hardware import base, DeviceManager
 from psychopy.localization import _translate
 from psychopy.hardware import keyboard
-# for legacy compatability, import PhotodiodeValidator and PhotodiodeValidationError here
-from psychopy.validation.photodiode import PhotodiodeValidator, PhotodiodeValidationError
 
 
 class PhotodiodeResponse(base.BaseResponse):
     # list of fields known to be a part of this response type
     fields = ["t", "value", "channel", "threshold"]
 
-    def __init__(self, t, value, channel, device=None, threshold=None):
+    def __init__(self, t, value, channel, threshold=None):
         # initialise base response class
-        base.BaseResponse.__init__(self, t=t, value=value, device=device)
+        base.BaseResponse.__init__(self, t=t, value=value)
         # store channel and threshold
         self.channel = channel
         self.threshold = threshold
@@ -156,7 +155,7 @@ class BasePhotodiodeGroup(base.BaseResponseDevice):
         
         return channels
     
-    def findPhotodiode(self, win, channel=None, retryLimit=5):
+    def findPhotodiode(self, win, channel=None):
         """
         Draws rectangles on the screen and records photodiode responses to recursively find the location of the diode.
 
@@ -272,52 +271,32 @@ class BasePhotodiodeGroup(base.BaseResponseDevice):
             # if none of these have returned, rect is too small to cover the whole photodiode, so return
             return responsive
 
-        def handleNonResponse(label, rect, timeout=5):
-            # log error
-            logging.error("Failed to find Photodiode")
-            # skip if retry limit hit
-            if retryLimit <= 0:
-                return None
-            # start a countdown
-            timer = core.CountdownTimer(start=timeout)
+        # reset state
+        self.state = [None] * self.channels
+        self.dispatchMessages()
+        self.clearResponses()
+        # recursively shrink rect around the photodiode
+        responsive = scanQuadrants()
+        # if cancelled, warn and continue
+        if responsive is None:
+            logging.warn(
+                "`findPhotodiode` procedure cancelled by user."
+            )
+            return (
+                layout.Position(self.pos, units="norm", win=win),
+                layout.Position(self.size, units="norm", win=win),
+            )
+        # if we didn't get any responses at all, prompt to try again
+        if not responsive:
             # set label text to alert user
-            msg = (
+            label.text = (
                 "Received no responses from photodiode during `findPhotodiode`. Photodiode may not "
                 "be connected or may be configured incorrectly.\n"
                 "\n"
-                "To manually specify the photodiode's position, press ENTER. To quit, press "
-                "ESCAPE. Otherwise, will retry in {:.0f}s\n"
-            )
-            label.foreColor = "red"
-            # start a frame loop until they press enter
-            keys = []
-            while timer.getTime() > 0 and not keys:
-                # get keys
-                keys = kb.getKeys()
-                # skip if escape pressed
-                if "escape" in keys:
-                    return None
-                # specify manually if return pressed
-                if "return" in keys:
-                    return specifyManually(label=label, rect=rect)
-                # format label
-                label.text = msg.format(timer.getTime())
-                # show label and square
-                label.draw()
-                # flip
-                win.flip()
-            # if we timed out...
-            logging.error("Trying to find photodiode again after failing")
-            # re-detect threshold
-            self.findThreshold(win, channel=channel)
-            # re-find photodiode
-            return self.findPhotodiode(win, channel=channel, retryLimit=retryLimit-1)
-        
-        def specifyManually(label, rect):
-            # set label text to alert user
-            label.text = (
-                "Use the arrow keys to move the photodiode patch and use the plus/minus keys to "
-                "resize it. Press ENTER when finished, or press ESCAPE to quit.\n"
+                "To continue, use the arrow keys to move the photodiode patch and use the "
+                "plus/minus keys to resize it.\n"
+                "\n"
+                "Press ENTER when finished."
             )
             label.foreColor = "red"
             # revert to defaults
@@ -327,18 +306,12 @@ class BasePhotodiodeGroup(base.BaseResponseDevice):
             # start a frame loop until they press enter
             keys = []
             res = 0.05
-            while "return" not in keys and "escape" not in keys:
+            while "return" not in keys:
                 # get keys
                 keys = kb.getKeys()
                 # skip if escape pressed
                 if "escape" in keys:
                     return None
-                # finish if return pressed
-                if "return" in keys:
-                    return (
-                        layout.Position(self.pos, units="norm", win=win),
-                        layout.Position(self.size, units="norm", win=win),
-                    )
                 # move rect according to arrow keys
                 pos = list(rect.pos)
                 if "left" in keys:
@@ -362,25 +335,13 @@ class BasePhotodiodeGroup(base.BaseResponseDevice):
                 rect.draw()
                 # flip
                 win.flip()
-
-        # reset state
-        self.state = [None] * self.channels
-        self.dispatchMessages()
-        self.clearResponses()
-        # recursively shrink rect around the photodiode
-        responsive = scanQuadrants()
-        # if cancelled, warn and continue
-        if responsive is None:
-            logging.warn(
-                "`findPhotodiode` procedure cancelled by user."
-            )
+            # wait for a keypress
+            kb.waitKeys()
+            # return defaults
             return (
                 layout.Position(self.pos, units="norm", win=win),
                 layout.Position(self.size, units="norm", win=win),
             )
-        # if we didn't get any responses at all, prompt to try again
-        if not responsive:
-            return handleNonResponse(label=label, rect=rect)
         # clear all the events created by this process
         self.state = [None] * self.channels
         self.dispatchMessages()
@@ -537,6 +498,10 @@ class BasePhotodiodeGroup(base.BaseResponseDevice):
         return self.state[channel]
 
 
+class PhotodiodeValidationError(BaseException):
+    pass
+
+
 class ScreenBufferSampler(BasePhotodiodeGroup):
     def __init__(self, win, threshold=125, pos=None, size=None, units=None):
         # store win
@@ -561,9 +526,8 @@ class ScreenBufferSampler(BasePhotodiodeGroup):
         """
         Check the screen for changes and dispatch events as appropriate
         """
-        from psychopy.visual import Window
         # if there's no window, skip
-        if not isinstance(self.win, Window):
+        if self.win is None:
             return
         # get rect
         left, bottom = self._pos.pix + self.win.size / 2
@@ -590,8 +554,7 @@ class ScreenBufferSampler(BasePhotodiodeGroup):
                 t=self.clock.getTime() - frameT,
                 value=state,
                 channel=0,
-                threshold=self._threshold,
-                device=self
+                threshold=self._threshold
             )
             self.receiveMessage(resp)
 
@@ -710,3 +673,142 @@ class ScreenBufferSampler(BasePhotodiodeGroup):
         self.setThreshold(127, channel=channel)
 
         return self.getThreshold(channel=channel)
+
+
+class PhotodiodeValidator:
+
+    def __init__(
+            self, win, diode, channel=None,
+            variability=1/60,
+            report="log",
+            autoLog=False):
+        # set autolog
+        self.autoLog = autoLog
+        # store window handle
+        self.win = win
+        # store diode handle
+        self.diode = diode
+        self.channel = channel
+        # store method of reporting
+        self.report = report
+        # set acceptable variability
+        self.variability = variability
+
+        from psychopy import visual
+        # black rect which is always drawn on win flip
+        self.offRect = visual.Rect(
+            win,
+            fillColor="black",
+            depth=1, autoDraw=True,
+            autoLog=False
+        )
+        # white rect which is only drawn when target stim is, and covers black rect
+        self.onRect = visual.Rect(
+            win,
+            fillColor="white",
+            depth=0, autoDraw=False,
+            autoLog=False
+        )
+        # update rects to match diode
+        self.updateRects()
+
+    def connectStimulus(self, stim):
+        # store mapping of stimulus to self in window
+        self.win.validators[stim] = self
+        stim.validator = self
+
+    def draw(self):
+        self.onRect.draw()
+
+    def updateRects(self):
+        """
+        Update the size and position of this validator's rectangles to match the size and position of the associated
+        diode.
+        """
+        for rect in (self.onRect, self.offRect):
+            # set units from diode
+            rect.units = self.diode.units
+            # set pos from diode, or choose default if None
+            if self.diode.pos is not None:
+                rect.pos = self.diode.pos
+            else:
+                rect.pos = layout.Position((0.95, -0.95), units="norm", win=self.win)
+            # set size from diode, or choose default if None
+            if self.diode.size is not None:
+                rect.size = self.diode.size
+            else:
+                rect.size = layout.Size((0.05, 0.05), units="norm", win=self.win)
+
+    def validate(self, state, t=None):
+        """
+        Confirm that stimulus was shown/hidden at the correct time, to within an acceptable margin of variability.
+
+        Parameters
+        ----------
+        state : bool
+            State which the photodiode is expected to have been in
+        t : clock.Timestamp, visual.Window or None
+            Time at which the photodiode should have read the given state.
+
+        Returns
+        -------
+        bool
+            True if photodiode state matched requested state, False otherwise.
+        """
+        # get and clear responses
+        messages = self.diode.getResponses(state=state, channel=self.channel, clear=True)
+        # if there have been no responses yet, return empty handed
+        if not messages:
+            return None, None
+
+        # if there are responses, get most recent timestamp
+        lastTime = messages[-1].t
+        # validate
+        valid = abs(lastTime - t) < self.variability
+
+        # construct message to report
+        validStr = "within acceptable variability"
+        if not valid:
+            validStr = "not " + validStr
+        logMsg = (
+            "Photodiode expected to receive {state} within {variability}s of {t}s. Actually received {state} at "
+            "{lastTime}. This is {validStr}."
+        ).format(
+            state=state, variability=self.variability, t=t, lastTime=lastTime, validStr=validStr
+        )
+
+        # report as requested
+        if self.report in ("log",):
+            # if report mode is log or error, log result
+            logging.debug(logMsg)
+        if self.report in ("err", "error") and not valid:
+            # if report mode is error, raise error for invalid
+            err = PhotodiodeValidationError(logMsg)
+            logging.error(err)
+            raise err
+        if callable(self.report):
+            # if self.report is a method, call it with args state, t, valid and logMsg
+            self.report(state, t, valid, logMsg)
+
+        # return timestamp and validity
+        return lastTime, valid
+
+    def resetTimer(self, clock=logging.defaultClock):
+        self.diode.resetTimer(clock=clock)
+
+    def getDiodeState(self):
+        return self.diode.getState()
+
+    @staticmethod
+    def onValid(isWhite):
+        pass
+
+    @staticmethod
+    def onInvalid(isWhite):
+        msg = "Stimulus validation failed. "
+        if isWhite:
+            msg += "Stimulus drawn when not expected."
+        else:
+            msg += "Stimulus not drawn when expected."
+
+        raise AssertionError(msg)

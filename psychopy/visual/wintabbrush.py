@@ -6,6 +6,7 @@ Wintab util objects / functions for stylus, position traces.
 import math
 
 from psychopy import visual
+from psychopy import logging
 from psychopy.visual.basevisual import MinimalStim
 
 class WintabBrush(MinimalStim):
@@ -56,19 +57,23 @@ class WintabBrush(MinimalStim):
         self.penTrace = PenTracesStim(win, lineWidth, lineColor, 
                                                opacity, maxlen, name, autoLog, 
                                                traceDepth)
+        self.isReporting = False
         if self.autoLog:
             logging.exp("Created {name} = {obj}".format(name=self.name,
                                                         obj=str(self)))
             
     def updateFromEvents(self,wtab_events):
-        self.penPos.updateFromEvent(wtab_events)
-        self.penTrace.updateFromEvents(wtab_events)
+        if self.isReporting == True:
+            self.penPos.updateFromEvent(wtab_events)
+            self.penTrace.updateFromEvents(wtab_events)
 
     def draw(self):
-        self.penPos.draw()
-        self.penTrace.draw()
+        if self.isReporting == True:
+            self.penPos.draw()
+            self.penTrace.draw()
 
     def reset(self):
+        self.isReporting = False
         self.penPos.clear()
         self.penTrace.clear()
 
@@ -188,6 +193,12 @@ class PenPositionStim(MinimalStim):
         tiltend = (pen_pos[0] + pen_tilt_xy[0] * self.tiltline_scalar,
                 pen_pos[1] + pen_tilt_xy[1] * self.tiltline_scalar)
         self.pen_tilt_line.end = tiltend
+
+        penPosX = last_evt.dict['x']
+        penPosY = last_evt.dict['y']
+        penPressure = last_evt.dict['pressure']
+
+        logging.exp("Pen Position: X: %s, Y: %s Pen Pressure: %s " % (str(penPosX), str(penPosY), str(penPressure)))
 
     def draw(self):
         """Draw the PenPositionStim to the opengl back buffer. This needs

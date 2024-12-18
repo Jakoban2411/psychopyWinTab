@@ -151,8 +151,6 @@ class KeyPress(BaseResponse):
             else:
                 self.name = keyNames[code]
         elif KeyboardDevice._backend == 'iohub':
-            if name is None:
-                name = code
             self.name = name
         # get value
         value = self.name
@@ -407,7 +405,7 @@ class KeyboardDevice(BaseResponseDevice, aliases=["keyboard"]):
             True if the two objects represent the same physical device
         """
         # all Keyboards are the same device
-        return isinstance(other, (KeyboardDevice, dict))
+        return True
 
     @classmethod
     def getBackend(self):

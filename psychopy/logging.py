@@ -127,14 +127,12 @@ def setDefaultClock(clock):
 
 class _LogEntry():
 
-    def __init__(self, level, message, t=None, obj=None, levelname=None):
+    def __init__(self, level, message, t=None, obj=None):
         super(_LogEntry, self).__init__()
         self.t = t
         self.t_ms = t * 1000
         self.level = level
-        if levelname is None:
-            levelname = getLevel(level)
-        self.levelname = levelname
+        self.levelname = getLevel(level)
         self.message = message
         self.obj = obj
 
@@ -277,7 +275,7 @@ class _Logger():
         for target in self.targets:
             self.lowestTarget = min(self.lowestTarget, target.level)
 
-    def log(self, message, level, t=None, obj=None, levelname=None):
+    def log(self, message, level, t=None, obj=None):
         """Add the `message` to the log stack at the appropriate `level`
 
         If no relevant targets (files or console) exist then the message is
@@ -292,7 +290,7 @@ class _Logger():
             t = defaultClock.getTime()
         # add message to list
         self.toFlush.append(
-            _LogEntry(t=t, level=level, levelname=levelname, message=message, obj=obj))
+            _LogEntry(t=t, level=level, message=message, obj=obj))
 
     def flush(self):
         """Process all current messages to each target
@@ -331,7 +329,7 @@ def critical(msg, t=None, obj=None):
     Send the message to any receiver of logging info (e.g. a LogFile)
     of level `log.CRITICAL` or higher
     """
-    root.log(msg, level=CRITICAL, t=t, obj=obj, levelname="CRITICAL")
+    root.log(msg, level=CRITICAL, t=t, obj=obj)
 fatal = critical
 
 
@@ -341,7 +339,7 @@ def error(msg, t=None, obj=None):
     Send the message to any receiver of logging info (e.g. a LogFile)
     of level `log.ERROR` or higher
     """
-    root.log(msg, level=ERROR, t=t, obj=obj, levelname="ERROR")
+    root.log(msg, level=ERROR, t=t, obj=obj)
 
 
 def warning(msg, t=None, obj=None):
@@ -350,7 +348,7 @@ def warning(msg, t=None, obj=None):
     Sends the message to any receiver of logging info (e.g. a LogFile)
     of level `log.WARNING` or higher
     """
-    root.log(msg, level=WARNING, t=t, obj=obj, levelname="WARNING")
+    root.log(msg, level=WARNING, t=t, obj=obj)
 warn = warning
 
 
@@ -363,7 +361,7 @@ def data(msg, t=None, obj=None):
     Sends the message to any receiver of logging info (e.g. a LogFile)
     of level `log.DATA` or higher
     """
-    root.log(msg, level=DATA, t=t, obj=obj, levelname="DATA")
+    root.log(msg, level=DATA, t=t, obj=obj)
 
 
 def exp(msg, t=None, obj=None):
@@ -376,7 +374,7 @@ def exp(msg, t=None, obj=None):
     Sends the message to any receiver of logging info (e.g. a LogFile)
     of level `log.EXP` or higher
     """
-    root.log(msg, level=EXP, t=t, obj=obj, levelname="EXP")
+    root.log(msg, level=EXP, t=t, obj=obj)
 
 
 def info(msg, t=None, obj=None):
@@ -388,7 +386,7 @@ def info(msg, t=None, obj=None):
     Sends the message to any receiver of logging info (e.g. a LogFile)
     of level `log.INFO` or higher
     """
-    root.log(msg, level=INFO, t=t, obj=obj, levelname="INFO")
+    root.log(msg, level=INFO, t=t, obj=obj)
 
 
 def debug(msg, t=None, obj=None):
@@ -401,7 +399,7 @@ def debug(msg, t=None, obj=None):
     Sends the message to any receiver of logging info (e.g. a LogFile)
     of level `log.DEBUG` or higher
     """
-    root.log(msg, level=DEBUG, t=t, obj=obj, levelname="DEBUG")
+    root.log(msg, level=DEBUG, t=t, obj=obj)
 
 
 def log(msg, level, t=None, obj=None):

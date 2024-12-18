@@ -3,9 +3,7 @@ import esprima
 import re
 from pathlib import Path
 
-import esprima.error_handler
 import pytest
-import tempfile
 
 from psychopy import experiment
 from psychopy.experiment.loops import TrialHandler
@@ -29,7 +27,7 @@ def _find_global_resource_in_js_experiment(script, resource):
         return present
 
     # Extract resources def at start of experiment
-    resourcesStr = re.search(r"(?<=resources: \[)[^\]]*", script).group(0)
+    resourcesStr = re.search("(?<=resources: \[)[^\]]*", script).group(0)
     # Return bool for whether specified resource is present
     return resource in resourcesStr
 
@@ -45,7 +43,6 @@ class BaseComponentTests:
         """
         # make blank experiment
         exp = experiment.Experiment()
-        exp.name = "Test" + self.comp.__name__ + "MinimalExp"
         # add a Routine
         rt = exp.addRoutine(routineName='TestRoutine')
         exp.flow.addRoutine(rt, 0)
@@ -70,16 +67,6 @@ class BaseComponentTests:
         yield
     
     # --- Heritable tests ---
-
-    def test_syntax_errors(self):
-        """
-        Create a basic implementation of this Component with everything set to defaults and check 
-        whether the resulting code has syntax errors
-        """
-        # create minimal experiment
-        comp, rt, exp = self.make_minimal_experiment()
-        # check syntax
-        utils.checkSyntax(exp, targets=self.comp.targets)
 
     def test_icons(self):
         """
@@ -182,11 +169,11 @@ class BaseComponentTests:
         # define cases and expected start/dur
         cases = [
             # blank start
-            {'name': "NoStart", 'startVal': "", 'stopVal': "1", 'startTime': None, 'duration': 1},
+            {'startVal': "", 'stopVal': "1", 'startTime': None, 'duration': 1},
             # blank stop
-            {'name': "NoStop", 'startVal': "0", 'stopVal': "", 'startTime': 0, 'duration': FOREVER},
+            {'startVal': "0", 'stopVal': "", 'startTime': 0, 'duration': FOREVER},
             # blank both
-            {'name': "NoStartStop", 'startVal': "", 'stopVal': "", 'startTime': None, 'duration': FOREVER},
+            {'startVal': "", 'stopVal': "", 'startTime': None, 'duration': FOREVER},
         ]
         # run all cases
         for case in cases:
@@ -200,19 +187,23 @@ class BaseComponentTests:
             assert duration == case['duration']
             # check that it's never non-slip safe
             assert not nonSlipSafe
-            # update experiment name to indicate what case we're in
-            case['name'] = self.comp.__name__ + case['name']
-            exp.name = "Test%(name)sExp" % case
-            # check that it still writes syntactially valid code
+            # temp file to save scripts to for flake
+            import tempfile
+            file = Path(tempfile.gettempdir()) / "test_blank_timing_script.py"
+            # write the script
+            script = exp.writeScript(target="PsychoPy")
+            file.write_text(script, encoding="utf-8")
+            # check for syntax errors
             try:
-                utils.checkSyntax(exp, targets=self.comp.targets)
-            except SyntaxError as err:
+                compile(script, str(file), "exec")
+            except Exception as err:
+                # save script
+                case['fail'] = Path(utils.TESTS_FAILS_PATH) / "test_blank_timing_script.py"
+                case['fail'].write_text(script, encoding="utf-8")
                 # raise error
-                case['err'] = err
                 raise AssertionError(
                     "Syntax error in compiled Builder code when startVal was '%(startVal)s' and "
-                    "stopVal was '%(stopVal)s'. Failed script saved in psychopy/tests/fails. "
-                    "Original error: %(err)s" % case
+                    "stopVal was '%(stopVal)s'. Failed script saved in '%(fail)s'" % case
                 )
 
     def test_disabled_default_val(self):

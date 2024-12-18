@@ -64,6 +64,11 @@ def addComponent(compClass):
 
     # check type and attributes of the class
     if not issubclass(compClass, (BaseComponent, BaseVisualComponent)):
+        logging.warning(
+            "Component `{}` does not appear to be a subclass of "
+            "`psychopy.experiment.components._base.BaseComponent`. This will be skipped."
+            .format(compName)
+        )
         return
     elif not hasattr(compClass, 'categories'):
         logging.warning(

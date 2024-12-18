@@ -17,7 +17,7 @@ class PenPositionStim(MinimalStim):
                  touching_color=(0, 255, 0), tiltline_color=(255, 255, 0),
                  tiltline_width=2,
                  min_size=0.033, size_range=0.1666, tiltline_scalar=1.0,
-                 name=None, autoLog=None, depth=-10000, colorSpace='rgb255'):
+                 name=None, autoLog=False, depth=-10000, colorSpace='rgb255'):
         self.win = win
         self.depth = depth
         super(PenPositionStim, self).__init__(name, autoLog)
@@ -68,6 +68,7 @@ class PenPositionStim(MinimalStim):
                                          end=[0, 0],
                                          colorSpace='rgb255',
                                          lineColor=self.tiltline_color,
+                                         autoLog=False,
                                          opacity=0.0)
         # self.pen_tilt_line.opacity=0.0
 
@@ -240,6 +241,7 @@ class PenTracesStim(MinimalStim):
                                                  size=1,
                                                  ori=0.0,
                                                  opacity=self.opacity,
+                                                 autoLog=False,
                                                  interpolate=True)
         self.pentracestim.append(self.current_pentrace)
 

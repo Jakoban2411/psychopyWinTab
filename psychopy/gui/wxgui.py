@@ -15,8 +15,6 @@ import os
 from psychopy.localization import _translate
 from packaging.version import Version
 
-from psychopy.tools.arraytools import IndexDict
-
 OK = wx.ID_OK
 
 thisVer = Version(wx.__version__)
@@ -284,9 +282,10 @@ class DlgFromDict(Dlg):
         # app = ensureWxApp() done by Dlg
         super().__init__(title)
 
-        self.copyDict = copyDict
-        self.originalDictionary = dictionary
-        self.dictionary = IndexDict(dictionary)
+        if copyDict:
+            self.dictionary = dictionary.copy()
+        else:
+            self.dictionary = dictionary
 
         self._keys = list(self.dictionary.keys())
 
@@ -320,11 +319,6 @@ class DlgFromDict(Dlg):
         if self.OK:
             for n, thisKey in enumerate(self._keys):
                 self.dictionary[thisKey] = self.data[n]
-            # if not copying dict, set values in-place
-            if not self.copyDict:
-                self.originalDictionary[thisKey] = self.data[thisKey]
-            
-            return self.dictionary
 
 
 def fileSaveDlg(initFilePath="", initFileName="",

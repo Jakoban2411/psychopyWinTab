@@ -24,7 +24,7 @@ import webbrowser
 from pathlib import Path
 from subprocess import Popen, PIPE
 
-from psychopy import experiment, logging, alerts
+from psychopy import experiment, logging
 from psychopy.app.utils import FrameSwitcher, FileDropTarget
 from psychopy.localization import _translate
 from psychopy.projects.pavlovia import getProject
@@ -539,7 +539,7 @@ class RunnerPanel(wx.Panel, ScriptProcess, handlers.ThemeMixin):
         self.splitter.SplitVertically(
             window1=self.topPanel,
             window2=self.bottomPanel,
-            sashPosition=360
+            sashPosition=480
         )
         self.splitter.SetMinimumPaneSize(360)
 
@@ -1053,7 +1053,6 @@ class RunnerOutputNotebook(aui.AuiNotebook, handlers.ThemeMixin):
             self.alertsPnl, caption=_translate("Alerts")
         )
         self.panels['alerts'] = self.alertsPnl
-        alerts.addAlertHandler(self.alertsPnl.ctrl)
 
         # StdOut
         self.stdoutPnl = ScriptOutputPanel(
@@ -1080,11 +1079,8 @@ class RunnerOutputNotebook(aui.AuiNotebook, handlers.ThemeMixin):
         # bind function when page receives focus
         self._readCache = {}
         self.Bind(aui.EVT_AUINOTEBOOK_PAGE_CHANGED, self.onFocus)
-        # min size is 80 chars / 40 lines
-        self.SetMinSize(wx.Size(
-            self.stdoutPnl.GetCharWidth() * 80, 
-            self.stdoutPnl.GetCharHeight() * 40, 
-        ))
+
+        self.SetMinSize(wx.Size(100, 100))  # smaller than window min size
 
     def setRead(self, i, state):
         """

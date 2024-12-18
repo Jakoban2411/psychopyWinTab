@@ -114,6 +114,29 @@ class _SoundBase(AttributeGetSetMixin):
     # def setVolume(self, newVol, log=True):
     # def _setSndFromFile(self, fileName):
     # def _setSndFromArray(self, thisArray):
+
+    def _parseSpeaker(self, speaker):
+        if speaker is None:
+            # if no device, populate from prefs
+            pref = prefs.hardware['audioDevice']
+            if isinstance(pref, (list, tuple)):
+                pref = pref[0]
+            speaker = pref
+        # look for device if initialised
+        device = DeviceManager.getDevice(speaker)
+        # if no matching name, try matching index
+        if device is None:
+            device = DeviceManager.getDeviceBy("index", speaker)
+        # if still no match, make a new device
+        if device is None:
+            device = DeviceManager.addDevice(
+                deviceClass="psychopy.hardware.speaker.SpeakerDevice",
+                deviceName=speaker,
+                index=speaker,
+            )
+
+        return device
+
     def setSound(self, value, secs=0.5, octave=4, hamming=True, log=True):
         """Set the sound to be played.
 
@@ -146,12 +169,10 @@ class _SoundBase(AttributeGetSetMixin):
         """
         # Re-init sound to ensure bad values will raise error during setting:
         self._snd = None
-        # make references to default stim into absolute paths
+
         if isinstance(value, str) and value in defaultStim:
             value = defaultStimRoot / defaultStim[value]
-        # if directly given a Microphone, get its last recording
-        if hasattr(value, "lastClip"):
-            value = value.lastClip
+
         # Coerces pathlib obj to string, else returns inputted value
         value = pathToString(value)
         try:

@@ -251,9 +251,9 @@ class Wintab(ioHubDeviceView):
                 dy = curr_samp.y - prev_samp.y
                 dt = (curr_samp.time - prev_samp.time)
                 if dt <= 0:
-                    print(
-                        'Warning: dt == 0: {}, {}, {}'.format(
-                            dt, curr_samp.time, prev_samp.time))
+                    # print(
+                    #     'Warning: dt == 0: {}, {}, {}'.format(
+                    #         dt, curr_samp.time, prev_samp.time))
                     curr_samp.velocity = (0, 0, 0)
                     curr_samp.acceleration = (0, 0, 0)
                 else:
